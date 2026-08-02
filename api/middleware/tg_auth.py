@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from api.config import settings
-from bot.database.db import get_session
+from api.database.db import get_session
 from bot.database.models import User, generate_referral_code
 
 security = HTTPBearer(auto_error=False)

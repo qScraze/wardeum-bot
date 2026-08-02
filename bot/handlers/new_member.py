@@ -16,11 +16,20 @@ router = Router()
 
 @router.my_chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> (MEMBER | ADMINISTRATOR)))
 async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
-    """Auto-register chat in DB when bot is added to a group by an admin/owner."""
-    if event.chat.type not in ("group", "supergroup"):
+    """Auto-register chat in DB when bot is added to a group/channel by an admin/owner."""
+    if event.chat.type not in ("group", "supergroup", "channel"):
         return
 
-    from bot.database.models import User, Chat, ChatSettings, generate_referral_code
+    from bot.database.models import User, Chat, ChatSettings, PlanEnum, generate_referral_code
+    from bot.config import config
+    import pathlib
+
+    PLAN_CHAT_LIMITS: dict[str, int] = {
+        "none": 0,
+        "lite": 2,
+        "pro": 5,
+        "corporate": 10,
+    }
 
     async with async_session_maker() as session:
         # Find or create owner user
@@ -36,14 +45,41 @@ async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
             session.add(user)
             await session.flush()
 
+        # Check subscription validity
+        now = datetime.utcnow()
+        if user.plan == PlanEnum.NONE or not user.subscription_end or user.subscription_end < now:
+            try:
+                await bot.leave_chat(event.chat.id)
+            except Exception:
+                pass
+            return
+
+        # Check chat limits
+        plan_str = user.plan.value if hasattr(user.plan, "value") else str(user.plan)
+        limit = PLAN_CHAT_LIMITS.get(plan_str, 0)
+        
+        count_result = await session.execute(
+            select(Chat).where(Chat.owner_id == user.id, Chat.is_active == True)
+        )
+        existing_chats = len(count_result.scalars().all())
+
         # Find or create chat
         stmt_chat = select(Chat).where(Chat.tg_id == event.chat.id)
         chat = await session.scalar(stmt_chat)
+        
+        if not chat and existing_chats >= limit:
+            # Reached limit and chat doesn't exist in DB
+            try:
+                await bot.leave_chat(event.chat.id)
+            except Exception:
+                pass
+            return
+
         if not chat:
             chat = Chat(
                 tg_id=event.chat.id,
                 owner_id=user.id,
-                title=event.chat.title or "Группа",
+                title=event.chat.title or "Чат",
                 username=event.chat.username,
                 is_active=True,
             )
@@ -53,8 +89,22 @@ async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
         else:
             chat.is_active = True
             chat.title = event.chat.title or chat.title
+            chat.username = event.chat.username or chat.username
 
         await session.commit()
+
+        # Attempt to download avatar
+        try:
+            chat_info = await bot.get_chat(event.chat.id)
+            if chat_info.photo:
+                file_id = chat_info.photo.small_file_id
+                file = await bot.get_file(file_id)
+                # Save to /app/data/avatars/{tg_id}.jpg
+                avatars_dir = pathlib.Path("data/avatars")
+                avatars_dir.mkdir(parents=True, exist_ok=True)
+                await bot.download_file(file.file_path, avatars_dir / f"{event.chat.id}.jpg")
+        except Exception as e:
+            print(f"Failed to download avatar for {event.chat.id}: {e}")
 
 
 @router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> MEMBER))

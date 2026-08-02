@@ -101,7 +101,18 @@ export function ChatSettings() {
         >
           <ChevronLeft size={22} />
         </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', flexShrink: 0, position: 'relative', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img 
+              src={`/api/chats/${chat.id}/avatar`} 
+              alt={chat.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', zIndex: 1 }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <Shield size={16} color="rgba(255,255,255,0.65)" style={{ zIndex: 0 }} />
+          </div>
           <h1
             style={{
               fontSize: 17,

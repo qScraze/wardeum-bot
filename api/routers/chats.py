@@ -9,6 +9,11 @@ from bot.database.models import User, Chat, ChatSettings, PlanEnum
 from api.schemas.schemas import (
     ChatResponse, ChatSettingsResponse, ChatSettingsUpdate, AddChatRequest
 )
+from fastapi.responses import FileResponse
+import aiohttp
+import pathlib
+import os
+from api.config import settings
 
 router = APIRouter(tags=["chats"])
 
@@ -91,11 +96,43 @@ async def add_chat(
             detail=f"Ваш тариф позволяет добавить не более {limit} чатов. Перейдите на более высокий тариф.",
         )
 
+    title = body.title
+    username = body.username
+
+    # Fetch chat and avatar from telegram
+    bot_token = settings.BOT_TOKEN
+    async with aiohttp.ClientSession() as http_session:
+        url = f"https://api.telegram.org/bot{bot_token}/getChat?chat_id={body.tg_id}"
+        async with http_session.get(url) as resp:
+            data = await resp.json()
+            if not data.get("ok"):
+                raise HTTPException(status_code=400, detail="Бот не добавлен в этот чат или нет доступа")
+            
+            chat_info = data["result"]
+            title = chat_info.get("title", body.title)
+            username = chat_info.get("username", body.username)
+            
+            photo = chat_info.get("photo")
+            if photo:
+                file_id = photo.get("small_file_id")
+                f_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
+                async with http_session.get(f_url) as f_resp:
+                    f_data = await f_resp.json()
+                    if f_data.get("ok"):
+                        file_path = f_data["result"]["file_path"]
+                        dl_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+                        async with http_session.get(dl_url) as dl_resp:
+                            if dl_resp.status == 200:
+                                avatars_dir = pathlib.Path("data/avatars")
+                                avatars_dir.mkdir(parents=True, exist_ok=True)
+                                with open(avatars_dir / f"{body.tg_id}.jpg", "wb") as f:
+                                    f.write(await dl_resp.read())
+
     chat = Chat(
         tg_id=body.tg_id,
         owner_id=current_user.id,
-        title=body.title,
-        username=body.username,
+        title=title,
+        username=username,
         is_active=True,
     )
     session.add(chat)
@@ -108,6 +145,23 @@ async def add_chat(
     await session.refresh(chat_settings)
 
     return _chat_to_response(chat, chat_settings)
+
+
+@router.get("/chats/{chat_id}/avatar")
+async def get_chat_avatar(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    chat = await session.scalar(select(Chat).where(Chat.id == chat_id, Chat.owner_id == current_user.id))
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    
+    avatar_path = pathlib.Path("data/avatars") / f"{chat.tg_id}.jpg"
+    if avatar_path.exists():
+        return FileResponse(avatar_path, media_type="image/jpeg")
+    
+    raise HTTPException(status_code=404, detail="Avatar not found")
 
 
 @router.get("/chats/{chat_id}", response_model=ChatResponse)

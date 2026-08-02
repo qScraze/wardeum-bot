@@ -51,9 +51,19 @@ export function ChatCard({ chat }: ChatCardProps) {
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
+          overflow: 'hidden',
+          position: 'relative'
         }}
       >
-        <Shield size={20} color="rgba(255,255,255,0.65)" />
+        <img 
+          src={`/api/chats/${chat.id}/avatar`} 
+          alt={chat.title}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', zIndex: 1 }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+        <Shield size={20} color="rgba(255,255,255,0.65)" style={{ zIndex: 0 }} />
       </div>
 
       {/* Info */}
