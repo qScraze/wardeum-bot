@@ -1,4 +1,5 @@
 import os
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -11,9 +12,19 @@ class Settings(BaseSettings):
     WEBHOOK_PATH: str = '/webhook'
     HOST: str = '0.0.0.0'
     PORT: int = 8080
-    FORCE_SUB_CHANNEL: int | None = None
+    FORCE_SUB_CHANNEL: int | str | None = None
     FORCE_SUB_ENABLED: bool = False
     SECRET_KEY: str = os.urandom(32).hex()
+
+    @field_validator("FORCE_SUB_CHANNEL", mode="before")
+    @classmethod
+    def parse_force_sub_channel(cls, v):
+        if not v or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
 
     @property
     def admin_ids_list(self) -> list[int]:
