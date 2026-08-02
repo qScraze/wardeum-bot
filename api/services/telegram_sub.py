@@ -1,4 +1,4 @@
-import httpx
+import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -13,20 +13,21 @@ async def check_telegram_subscription(bot_token: str, channel_id: int | str, use
     formatted_chat_id = format_telegram_channel_id(channel_id)
     url = f"https://api.telegram.org/bot{bot_token}/getChatMember"
     params = {
-        "chat_id": formatted_chat_id,
-        "user_id": user_tg_id
+        "chat_id": str(formatted_chat_id),
+        "user_id": str(user_tg_id)
     }
     
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(url, params=params)
-            data = resp.json()
-            if data.get("ok"):
-                status = data.get("result", {}).get("status")
-                return status in ["creator", "administrator", "member", "restricted"]
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=5.0) as resp:
+                data = await resp.json()
+                if data.get("ok"):
+                    status = data.get("result", {}).get("status")
+                    return status in ["creator", "administrator", "member", "restricted"]
     except Exception:
         pass
     return False
+
 
 async def get_user_sub_status(session: AsyncSession, user_tg_id: int) -> tuple[bool, str | None]:
     """Returns (is_subscribed, force_sub_url)"""
