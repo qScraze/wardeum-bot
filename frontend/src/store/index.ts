@@ -12,6 +12,8 @@ export interface UserProfile {
   extra_days: number
   referral_code: string
   is_admin: boolean
+  is_subscribed?: boolean
+  force_sub_url?: string
 }
 
 export interface ChatSettings {

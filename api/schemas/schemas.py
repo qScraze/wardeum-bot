@@ -12,6 +12,8 @@ class UserResponse(BaseModel):
     extra_days: int
     referral_code: str
     is_admin: bool = False
+    is_subscribed: bool = True
+    force_sub_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -99,7 +101,7 @@ class KeyCreateRequest(BaseModel):
 
 class ForceSubUpdate(BaseModel):
     enabled: bool
-    channel_id: Optional[int] = None
+    channel_id: Optional[int | str] = None
 
 class GrantPlanRequest(BaseModel):
     plan: str

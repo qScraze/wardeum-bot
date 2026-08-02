@@ -248,15 +248,26 @@ async def update_force_sub(
     _: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ):
+    from bot.middlewares.subscription import format_telegram_channel_id
+
+    parsed_channel_id = None
+    if body.channel_id is not None and str(body.channel_id).strip():
+        formatted = format_telegram_channel_id(body.channel_id)
+        if isinstance(formatted, int):
+            parsed_channel_id = formatted
+        elif str(formatted).lstrip("-").isdigit():
+            parsed_channel_id = int(formatted)
+
     force_sub = await session.scalar(select(ForceSub).where(ForceSub.id == 1))
     if not force_sub:
-        force_sub = ForceSub(id=1, enabled=body.enabled, channel_id=body.channel_id)
+        force_sub = ForceSub(id=1, enabled=body.enabled, channel_id=parsed_channel_id)
         session.add(force_sub)
     else:
         force_sub.enabled = body.enabled
-        force_sub.channel_id = body.channel_id
+        force_sub.channel_id = parsed_channel_id
     await session.commit()
     return {"success": True, "enabled": force_sub.enabled, "channel_id": force_sub.channel_id}
+
 
 
 @router.get("/force-sub")

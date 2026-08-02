@@ -1,10 +1,11 @@
 import os
+from typing import Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     BOT_TOKEN: str
-    ADMIN_IDS: str | list[int] = ""
+    ADMIN_IDS: Any = ""
     DATABASE_URL: str = 'sqlite+aiosqlite:///./wardeum.db'
     GEMINI_API_KEY: str = ''
     WEBAPP_URL: str = ''
@@ -28,11 +29,24 @@ class Settings(BaseSettings):
 
     @property
     def admin_ids_list(self) -> list[int]:
+        if isinstance(self.ADMIN_IDS, int):
+            return [self.ADMIN_IDS]
         if isinstance(self.ADMIN_IDS, list):
-            return self.ADMIN_IDS
+            res = []
+            for x in self.ADMIN_IDS:
+                try:
+                    res.append(int(x))
+                except (ValueError, TypeError):
+                    pass
+            return res
         if not self.ADMIN_IDS:
             return []
-        return [int(x.strip()) for x in str(self.ADMIN_IDS).split(",") if x.strip().isdigit()]
+        res = []
+        for x in str(self.ADMIN_IDS).split(","):
+            x_clean = x.strip()
+            if x_clean.lstrip("-").isdigit():
+                res.append(int(x_clean))
+        return res
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,3 +55,4 @@ class Settings(BaseSettings):
     )
 
 config = Settings()
+

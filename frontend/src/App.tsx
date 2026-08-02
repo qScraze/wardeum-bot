@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { Navbar } from './components/Navbar'
 import { ToastProvider } from './components/ui/Toast'
+import { ForceSubModal } from './components/ForceSubModal'
 import { Home } from './pages/Home'
 import { ChatSettings } from './pages/ChatSettings'
 import { Subscription } from './pages/Subscription'
@@ -59,6 +60,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100dvh', background: '#0A0A0A' }}>
       <ToastProvider />
+      <ForceSubModal />
       <Routes>
         <Route path="/"              element={<Home />} />
         <Route path="/chat/:id"      element={<ChatSettings />} />

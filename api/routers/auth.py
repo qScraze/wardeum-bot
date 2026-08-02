@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.database.db import get_session
 from api.middleware.tg_auth import get_current_user
 from api.config import settings
+from api.services.telegram_sub import get_user_sub_status
 from bot.database.models import User
 from api.schemas.schemas import UserResponse
 
@@ -13,8 +14,10 @@ router = APIRouter(tags=["auth"])
 @router.get("/me", response_model=UserResponse)
 async def get_me(
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     """Возвращает профиль текущего пользователя."""
+    is_subscribed, force_sub_url = await get_user_sub_status(session, current_user.tg_id)
     return UserResponse(
         id=current_user.id,
         tg_id=current_user.tg_id,
@@ -25,4 +28,7 @@ async def get_me(
         extra_days=current_user.extra_days,
         referral_code=current_user.referral_code,
         is_admin=current_user.tg_id in settings.admin_ids_list,
+        is_subscribed=is_subscribed,
+        force_sub_url=force_sub_url,
     )
+

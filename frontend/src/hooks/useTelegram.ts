@@ -37,6 +37,7 @@ declare global {
         }
         showAlert: (message: string, callback?: () => void) => void
         showConfirm: (message: string, callback?: (ok: boolean) => void) => void
+        openTelegramLink?: (url: string) => void
       }
     }
   }

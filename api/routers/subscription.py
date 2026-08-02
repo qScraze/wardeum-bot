@@ -165,3 +165,17 @@ async def get_referral(
         "total_referrals": total_referrals,
         "total_bonus_days": total_bonus,
     }
+
+
+@router.get("/subscription/check-sub")
+async def check_sub(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    from api.services.telegram_sub import get_user_sub_status
+    is_subscribed, force_sub_url = await get_user_sub_status(session, current_user.tg_id)
+    return {
+        "is_subscribed": is_subscribed,
+        "force_sub_url": force_sub_url,
+    }
+

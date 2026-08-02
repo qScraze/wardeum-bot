@@ -46,6 +46,9 @@ export const applyPromo = (code: string) =>
 export const activateKey = (key: string) =>
   api.post('/api/subscription/key', { key }).then((r) => r.data)
 export const getReferral = () => api.get('/api/subscription/referral').then((r) => r.data)
+export const checkSubscription = () =>
+  api.get('/api/subscription/check-sub').then((r) => r.data)
+
 
 // ─── Blacklist ────────────────────────────────────────────────────────────────
 export const getBlacklist = (page = 1, limit = 20) =>
