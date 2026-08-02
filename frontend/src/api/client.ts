@@ -65,6 +65,7 @@ export const listPromos = () => api.get('/api/admin/promos').then((r) => r.data)
 export const createKeys = (data: unknown) =>
   api.post('/api/admin/keys', data).then((r) => r.data)
 export const listKeys = () => api.get('/api/admin/keys').then((r) => r.data)
+export const deleteKey = (keyId: number) => api.delete(`/api/admin/keys/${keyId}`)
 export const updateForceSub = (data: { enabled: boolean; channel_id?: number | null }) =>
   api.put('/api/admin/force-sub', data).then((r) => r.data)
 export const getForceSub = () => api.get('/api/admin/force-sub').then((r) => r.data)

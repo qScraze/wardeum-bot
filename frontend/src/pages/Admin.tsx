@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useApi, useMutation } from '../hooks/useApi'
 import {
   getAdminStats, getAdminUsers, grantPlan,
   createPromo, listPromos,
-  createKeys, listKeys,
+  createKeys, listKeys, deleteKey,
   getForceSub, updateForceSub,
 } from '../api/client'
 import { Button } from '../components/ui/Button'
@@ -260,7 +261,17 @@ function KeysTab() {
     }
   }
 
-  const keys = (data as Array<{ key: string; plan: string; duration_days: number; used: boolean }> | null) ?? []
+  const handleDeleteKey = async (id: number) => {
+    try {
+      await deleteKey(id)
+      showToast('Ключ удалён', 'success')
+      refetch()
+    } catch {
+      showToast('Ошибка удаления ключа', 'error')
+    }
+  }
+
+  const keys = (data as Array<{ id: number; key: string; plan: string; duration_days: number; used: boolean }> | null) ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -301,12 +312,19 @@ function KeysTab() {
 
       {!loading && keys.length > 0 && (
         <div className="card" style={{ overflow: 'hidden' }}>
-          {keys.slice(0, 20).map((k, i) => (
-            <div key={k.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: i < Math.min(keys.length, 20) - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', opacity: k.used ? 0.4 : 1 }}>
+          {keys.slice(0, 50).map((k, i) => (
+            <div key={k.id || k.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: i < Math.min(keys.length, 50) - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', opacity: k.used ? 0.4 : 1 }}>
               <p style={{ fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.04em' }}>{k.key}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Badge plan={k.plan} />
                 {k.used && <Badge variant="danger" style={{ fontSize: 10 }}>Использован</Badge>}
+                <button
+                  onClick={() => handleDeleteKey(k.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,69,58,0.7)', display: 'flex', padding: 4, borderRadius: 6 }}
+                  title="Удалить ключ"
+                >
+                  <Trash2 size={15} />
+                </button>
               </div>
             </div>
           ))}

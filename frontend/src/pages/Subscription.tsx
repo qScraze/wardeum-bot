@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Check, Copy, Tag, Key } from 'lucide-react'
 import { useStore } from '../store'
 import { useApi } from '../hooks/useApi'
-import { getPlans, applyPromo, activateKey, getReferral } from '../api/client'
+import { getMe, getPlans, applyPromo, activateKey, getReferral } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
@@ -24,7 +24,7 @@ interface ReferralInfo {
 }
 
 export function Subscription() {
-  const { user } = useStore()
+  const { user, setUser } = useStore()
   const [promoCode, setPromoCode] = useState('')
   const [activationKey, setActivationKey] = useState('')
   const [applyingPromo, setApplyingPromo] = useState(false)
@@ -32,6 +32,15 @@ export function Subscription() {
 
   const { data: plans, loading: plansLoading } = useApi<PlanInfo[]>(getPlans, [])
   const { data: referral } = useApi<ReferralInfo>(getReferral, [])
+
+  const refreshUser = async () => {
+    try {
+      const updatedUser = await getMe()
+      setUser(updatedUser)
+    } catch {
+      // ignore
+    }
+  }
 
   const now = new Date()
   const subEnd = user?.subscription_end ? new Date(user.subscription_end) : null
@@ -46,6 +55,7 @@ export function Subscription() {
       const result = await applyPromo(promoCode.trim())
       showToast(result.message, 'success')
       setPromoCode('')
+      await refreshUser()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } }
       showToast(err?.response?.data?.detail ?? 'Промокод не подходит', 'error')
@@ -61,6 +71,7 @@ export function Subscription() {
       const result = await activateKey(activationKey.trim())
       showToast(result.message, 'success')
       setActivationKey('')
+      await refreshUser()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } }
       showToast(err?.response?.data?.detail ?? 'Ключ не подходит', 'error')

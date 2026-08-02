@@ -229,6 +229,19 @@ async def list_keys(
     ]
 
 
+@router.delete("/keys/{key_id}", status_code=204)
+async def delete_key(
+    key_id: int,
+    _: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    key = await session.scalar(select(ActivationKey).where(ActivationKey.id == key_id))
+    if not key:
+        raise HTTPException(status_code=404, detail="Ключ не найден")
+    await session.delete(key)
+    await session.commit()
+
+
 @router.put("/force-sub")
 async def update_force_sub(
     body: ForceSubUpdate,

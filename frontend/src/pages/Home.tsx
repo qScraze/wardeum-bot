@@ -56,16 +56,8 @@ export function Home() {
   return (
     <div className="page fade-in" style={{ paddingTop: 20 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Чаты</h1>
-        <Button
-          size="sm"
-          onClick={() => setShowAddModal(true)}
-          style={{ gap: 4 }}
-        >
-          <Plus size={16} />
-          Добавить
-        </Button>
       </div>
 
       {/* List */}
@@ -98,10 +90,20 @@ export function Home() {
           <Button onClick={() => setShowAddModal(true)}>Добавить чат</Button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {chats.map((chat) => (
-            <ChatCard key={chat.id} chat={chat} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {chats.map((chat) => (
+              <ChatCard key={chat.id} chat={chat} />
+            ))}
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => setShowAddModal(true)}
+            style={{ width: '100%', marginTop: 8 }}
+          >
+            <Plus size={16} />
+            Добавить ещё чат
+          </Button>
         </div>
       )}
 

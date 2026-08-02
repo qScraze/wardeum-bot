@@ -20,7 +20,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 100,
+        zIndex: 1000,
         display: 'flex',
         alignItems: 'flex-end',
       }}
@@ -31,8 +31,8 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(8px)',
         }}
       />
 
@@ -42,11 +42,12 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
           position: 'relative',
           width: '100%',
           background: '#1C1C1E',
-          borderRadius: '20px 20px 0 0',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          padding: '20px 20px calc(20px + env(safe-area-inset-bottom,0px))',
-          maxHeight: '88vh',
+          borderRadius: '24px 24px 0 0',
+          borderTop: '1px solid rgba(255,255,255,0.12)',
+          padding: '20px 20px max(32px, env(safe-area-inset-bottom, 32px))',
+          maxHeight: '85vh',
           overflowY: 'auto',
+          boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
         }}
       >
         {/* Handle */}
