@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 router = Router()
 
 def is_admin(user_id: int) -> bool:
-    return user_id in config.ADMIN_IDS
+    return user_id in config.admin_ids_list
 
 @router.message(Command("admin_stats"))
 async def admin_stats(message: Message):
