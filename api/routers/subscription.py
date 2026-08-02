@@ -142,6 +142,27 @@ async def activate_key(
     }
 
 
+import aiohttp
+
+_bot_username = None
+
+async def get_bot_username() -> str:
+    global _bot_username
+    if _bot_username is not None:
+        return _bot_username
+    try:
+        from api.config import settings
+        url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getMe"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=3.0) as resp:
+                data = await resp.json()
+                if data.get("ok"):
+                    _bot_username = data["result"]["username"]
+                    return _bot_username
+    except Exception:
+        pass
+    return "wardeum_bot"
+
 @router.get("/subscription/referral")
 async def get_referral(
     current_user: User = Depends(get_current_user),
@@ -156,11 +177,11 @@ async def get_referral(
         )
     ) or 0
 
-    bot_username = "wardeum_bot"  # change to actual bot username in production
-    referral_url = f"https://t.me/{bot_username}?start=ref_{current_user.referral_code}"
+    bot_username = await get_bot_username()
+    referral_url = f"https://t.me/{bot_username}?start=ref_{current_user.tg_id}"
 
     return {
-        "code": current_user.referral_code,
+        "code": str(current_user.tg_id),
         "url": referral_url,
         "total_referrals": total_referrals,
         "total_bonus_days": total_bonus,

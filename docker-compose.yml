@@ -58,6 +58,18 @@ services:
     networks:
       - wardeum_net
 
+  # ─── Cloudflare Tunnel ───────────────────────────────────────────────────────
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: wardeum_tunnel
+    restart: unless-stopped
+    command: tunnel --url http://nginx:80
+    depends_on:
+      - nginx
+    networks:
+      - wardeum_net
+
+
 volumes:
   wardeum_data:
     driver: local

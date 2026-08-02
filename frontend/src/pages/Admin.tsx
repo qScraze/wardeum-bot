@@ -76,6 +76,7 @@ function UsersTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [grantForm, setGrantForm] = useState({ plan: 'lite', days: '30' })
   const [granting, setGranting] = useState(false)
+  const { user, setUser } = useStore()
 
   const { data, loading, refetch } = useApi(
     () => getAdminUsers(1, search),
@@ -89,6 +90,10 @@ function UsersTab() {
       showToast('Тариф выдан', 'success')
       setExpandedId(null)
       refetch()
+      if (user && tgId === user.tg_id) {
+        const updated = await getMe()
+        setUser(updated)
+      }
     } catch {
       showToast('Ошибка', 'error')
     } finally {

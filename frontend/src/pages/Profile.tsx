@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Copy, MessageCircle } from 'lucide-react'
 import { useStore } from '../store'
 import { useTelegram } from '../hooks/useTelegram'
@@ -6,14 +6,22 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { showToast } from '../components/ui/Toast'
 import { useNavigate } from 'react-router-dom'
+import { getMe } from '../api/client'
 
 const PLAN_NAMES: Record<string, string> = {
   none: 'Без тарифа', lite: 'Лайт', pro: 'Про', corporate: 'Корпоративный',
 }
 
 export function Profile() {
-  const { user } = useStore()
+  const { user, setUser } = useStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getMe()
+      .then(setUser)
+      .catch(() => {})
+  }, [setUser])
+
 
   if (!user) {
     return (
@@ -106,14 +114,14 @@ export function Profile() {
       </div>
 
       {/* Referral */}
-      <p className="section-label">Реферальный код</p>
+      <p className="section-label">Реферальная ссылка</p>
       <div className="card" style={{ padding: '14px 18px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'monospace', fontSize: 16, letterSpacing: '0.12em', fontWeight: 600 }}>
-            {user.referral_code}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', color: '#FFFFFF', maxWidth: '70%' }}>
+            {`https://t.me/wardeum_bot?start=ref_${user.tg_id}`}
           </span>
           <button
-            onClick={() => copy(user.referral_code)}
+            onClick={() => copy(`https://t.me/wardeum_bot?start=ref_${user.tg_id}`)}
             style={{
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid rgba(255,255,255,0.08)',

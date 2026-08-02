@@ -42,6 +42,11 @@ export function Subscription() {
     }
   }
 
+  React.useEffect(() => {
+    refreshUser()
+  }, [])
+
+
   const now = new Date()
   const subEnd = user?.subscription_end ? new Date(user.subscription_end) : null
   const daysLeft = subEnd
@@ -231,8 +236,8 @@ export function Subscription() {
                 marginBottom: 10,
               }}
             >
-              <span style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: '0.1em', color: '#FFFFFF' }}>
-                {referral.code}
+              <span style={{ fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', color: '#FFFFFF', maxWidth: '85%' }}>
+                {referral.url}
               </span>
               <button
                 onClick={() => copy(referral.url, 'Ссылка скопирована')}

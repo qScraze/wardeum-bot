@@ -9,8 +9,11 @@ async def generate_referral_code() -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=8))
 
 async def process_referral(inviter_code: str, new_user_tg_id: int, session: AsyncSession) -> bool:
-    # Find inviter
-    stmt = select(User).where(User.referral_code == inviter_code)
+    # Find inviter (strict tg_id only)
+    if not inviter_code.isdigit():
+        return False
+        
+    stmt = select(User).where(User.tg_id == int(inviter_code))
     result = await session.execute(stmt)
     inviter = result.scalar_one_or_none()
     
@@ -28,7 +31,7 @@ async def process_referral(inviter_code: str, new_user_tg_id: int, session: Asyn
     # Prevent self-referral
     if inviter.id == invitee.id:
         return False
-
+        
     invitee.referred_by = inviter.id
     
     # Create referral record
@@ -40,6 +43,7 @@ async def process_referral(inviter_code: str, new_user_tg_id: int, session: Asyn
     
     await session.commit()
     return True
+
 
 async def add_bonus_days(user_id: int, days: int, session: AsyncSession) -> None:
     stmt = select(User).where(User.id == user_id)
