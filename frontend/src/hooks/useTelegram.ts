@@ -18,6 +18,7 @@ declare global {
             last_name?: string
             username?: string
             is_premium?: boolean
+            photo_url?: string
           }
           start_param?: string
         }

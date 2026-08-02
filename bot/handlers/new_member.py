@@ -10,7 +10,52 @@ from bot.services.network_ban import check_network_ban
 from bot.services.captcha_gen import generate_captcha_gif, generate_code
 from datetime import datetime, timedelta
 
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, IS_NOT_MEMBER, MEMBER, ADMINISTRATOR
+
 router = Router()
+
+@router.my_chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> (MEMBER | ADMINISTRATOR)))
+async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
+    """Auto-register chat in DB when bot is added to a group by an admin/owner."""
+    if event.chat.type not in ("group", "supergroup"):
+        return
+
+    from bot.database.models import User, Chat, ChatSettings, generate_referral_code
+
+    async with async_session_maker() as session:
+        # Find or create owner user
+        stmt_user = select(User).where(User.tg_id == event.from_user.id)
+        user = await session.scalar(stmt_user)
+        if not user:
+            user = User(
+                tg_id=event.from_user.id,
+                username=event.from_user.username,
+                first_name=event.from_user.first_name or "User",
+                referral_code=generate_referral_code(),
+            )
+            session.add(user)
+            await session.flush()
+
+        # Find or create chat
+        stmt_chat = select(Chat).where(Chat.tg_id == event.chat.id)
+        chat = await session.scalar(stmt_chat)
+        if not chat:
+            chat = Chat(
+                tg_id=event.chat.id,
+                owner_id=user.id,
+                title=event.chat.title or "Группа",
+                username=event.chat.username,
+                is_active=True,
+            )
+            session.add(chat)
+            await session.flush()
+            session.add(ChatSettings(chat_id=chat.id))
+        else:
+            chat.is_active = True
+            chat.title = event.chat.title or chat.title
+
+        await session.commit()
+
 
 @router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> MEMBER))
 async def on_new_member(event: ChatMemberUpdated, bot: Bot):

@@ -58,23 +58,14 @@ export function Home() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Чаты</h1>
-        <button
+        <Button
+          size="sm"
           onClick={() => setShowAddModal(true)}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: '#FFFFFF',
-          }}
+          style={{ gap: 4 }}
         >
-          <Plus size={18} />
-        </button>
+          <Plus size={16} />
+          Добавить
+        </Button>
       </div>
 
       {/* List */}

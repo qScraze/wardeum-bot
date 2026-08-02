@@ -1,6 +1,7 @@
 import React from 'react'
 import { Copy, MessageCircle } from 'lucide-react'
 import { useStore } from '../store'
+import { useTelegram } from '../hooks/useTelegram'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { showToast } from '../components/ui/Toast'
@@ -22,6 +23,9 @@ export function Profile() {
     )
   }
 
+  const { user: tgUser } = useTelegram()
+  const photoUrl = tgUser?.photo_url
+
   const initials = user.first_name.slice(0, 2).toUpperCase()
   const hue = user.first_name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360
   const plan = user.plan ?? 'none'
@@ -36,24 +40,40 @@ export function Profile() {
     <div className="page fade-in" style={{ paddingTop: 32 }}>
       {/* Avatar */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
-        <div
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: `hsl(${hue},18%,22%)`,
-            border: '1px solid rgba(255,255,255,0.10)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 28,
-            fontWeight: 700,
-            color: `hsl(${hue},45%,68%)`,
-            marginBottom: 12,
-          }}
-        >
-          {initials}
-        </div>
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={user.first_name}
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '1px solid rgba(255,255,255,0.12)',
+              marginBottom: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: `hsl(${hue},18%,22%)`,
+              border: '1px solid rgba(255,255,255,0.10)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              fontWeight: 700,
+              color: `hsl(${hue},45%,68%)`,
+              marginBottom: 12,
+            }}
+          >
+            {initials}
+          </div>
+        )}
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{user.first_name}</h1>
         {user.username && (
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.40)' }}>@{user.username}</p>
