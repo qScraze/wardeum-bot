@@ -1,12 +1,13 @@
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, func
 from bot.database.models import User, Referral, PromoCode, ActivationKey, PlanEnum
 from bot.database.db import async_session_maker
 from bot.services.referral import generate_referral_code, process_referral
+from bot.services.captcha_gen import generate_code, generate_captcha_gif
 from bot.config import config
 from datetime import datetime, timedelta
 
@@ -30,17 +31,58 @@ def get_start_keyboard() -> InlineKeyboardMarkup:
         ]
     ])
 
+def is_admin(user_id: int) -> bool:
+    return user_id in config.admin_ids_list
+
+async def send_captcha(message: Message, session):
+    # Генерируем новый код
+    code = generate_code()
+    
+    # Ищем или создаем пользователя в БД
+    stmt = select(User).where(User.tg_id == message.from_user.id)
+    user = await session.scalar(stmt)
+    
+    if not user:
+        new_ref_code = await generate_referral_code()
+        user = User(
+            tg_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            referral_code=new_ref_code,
+            captcha_passed=False,
+            captcha_code=code
+        )
+        session.add(user)
+    else:
+        user.captcha_code = code
+        user.captcha_passed = False
+        
+    await session.commit()
+    
+    # Генерируем GIF
+    gif_bytes = generate_captcha_gif(code)
+    
+    await message.answer_animation(
+        animation=BufferedInputFile(gif_bytes, filename="captcha.gif"),
+        caption="🤖 <b>Проверка на робота</b>\n\nЧтобы начать пользоваться ботом, пожалуйста, введите код с картинки выше:"
+    )
+
 @router.message(CommandStart())
-async def start_cmd(message: Message):
+async def start_cmd(message: Message, state: FSMContext):
+    # Сбрасываем любые состояния FSM при старте
+    await state.clear()
+    
     args = message.text.split(maxsplit=1)
     ref_code = None
     if len(args) > 1 and args[1].startswith("ref_"):
         ref_code = args[1][4:]
 
     async with async_session_maker() as session:
+        # Проверяем, является ли пользователь админом
+        user_is_admin = is_admin(message.from_user.id)
+        
         stmt = select(User).where(User.tg_id == message.from_user.id)
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
+        user = await session.scalar(stmt)
 
         if not user:
             new_ref_code = await generate_referral_code()
@@ -48,26 +90,93 @@ async def start_cmd(message: Message):
                 tg_id=message.from_user.id,
                 username=message.from_user.username,
                 first_name=message.from_user.first_name,
-                referral_code=new_ref_code
+                referral_code=new_ref_code,
+                captcha_passed=True if user_is_admin else False
             )
             session.add(user)
             await session.flush()
             
-            if ref_code:
+            if ref_code and not user_is_admin:
                 await process_referral(ref_code, message.from_user.id, session)
                 
             await session.commit()
+        elif user_is_admin and not user.captcha_passed:
+            user.captcha_passed = True
+            await session.commit()
+
+        # Если админ — сразу пускаем
+        if user_is_admin:
+            welcome_text = (
+                "🛡 <b>Добро пожаловать в Wardeum (Панель Администратора)!</b>\n\n"
+                "Вы авторизованы как администратор. Капча пропущена.\n"
+                "Выберите нужное действие в меню ниже:"
+            )
+            await message.answer(welcome_text, reply_markup=get_start_keyboard(), parse_mode="HTML")
+            return
             
+        # Для обычных пользователей проверяем прохождение капчи
+        if not user.captcha_passed:
+            await send_captcha(message, session)
+            return
+
+    # Если капча уже пройдена обычным пользователем
     welcome_text = (
         "🛡 <b>Добро пожаловать в Wardeum!</b>\n\n"
         "Я — ваш персональный Telegram бот с поддержкой реферальной системы и управления подписками.\n\n"
         "Выберите нужное действие в меню ниже:"
     )
-    
     await message.answer(welcome_text, reply_markup=get_start_keyboard(), parse_mode="HTML")
+
+# Обработчик проверки капчи
+@router.message(F.text, ~F.text.startswith("/"))
+async def check_captcha_msg(message: Message, state: FSMContext):
+    # Если пользователь находится в FSM состояниях (например, вводит промокод), то капча не проверяется тут
+    current_state = await state.get_state()
+    if current_state is not None:
+        return
+
+    # Если пользователь админ, то капча его не касается
+    if is_admin(message.from_user.id):
+        return
+
+    async with async_session_maker() as session:
+        stmt = select(User).where(User.tg_id == message.from_user.id)
+        user = await session.scalar(stmt)
+        
+        # Если пользователя нет в БД или капча уже пройдена — ничего не делаем
+        if not user or user.captcha_passed:
+            return
+            
+        user_code = message.text.strip()
+        
+        if user.captcha_code and user_code.lower() == user.captcha_code.lower():
+            # Капча пройдена!
+            user.captcha_passed = True
+            user.captcha_code = None
+            await session.commit()
+            
+            await message.answer("✅ <b>Проверка успешно пройдена!</b>")
+            
+            welcome_text = (
+                "🛡 <b>Добро пожаловать в Wardeum!</b>\n\n"
+                "Вы успешно подтвердили, что не являетесь роботом.\n"
+                "Выберите нужное действие в меню ниже:"
+            )
+            await message.answer(welcome_text, reply_markup=get_start_keyboard(), parse_mode="HTML")
+        else:
+            # Капча не пройдена, генерируем новую
+            await message.answer("❌ <b>Неверный код!</b> Попробуйте еще раз.")
+            await send_captcha(message, session)
 
 @router.message(Command("help"))
 async def help_cmd(message: Message):
+    # Не пускаем к справке, если капча не пройдена
+    if not is_admin(message.from_user.id):
+        async with async_session_maker() as session:
+            user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
+            if not user or not user.captcha_passed:
+                return
+
     text = (
         "<b>Справка по боту Wardeum:</b>\n\n"
         "Используйте кнопки под сообщением для быстрой навигации:\n"

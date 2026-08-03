@@ -34,6 +34,8 @@ class User(Base):
     subscription_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     plan: Mapped[PlanEnum] = mapped_column(String, default=PlanEnum.NONE, nullable=False)
     extra_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    captcha_passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    captcha_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 

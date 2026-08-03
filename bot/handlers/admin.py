@@ -42,6 +42,8 @@ def get_back_keyboard() -> InlineKeyboardMarkup:
 
 @router.message(Command("admin"))
 async def admin_menu_cmd(message: Message):
+    import logging
+    logging.info(f"Command /admin triggered by user {message.from_user.id}")
     if not is_admin(message.from_user.id):
         return
         
