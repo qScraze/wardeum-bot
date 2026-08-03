@@ -135,13 +135,13 @@ async def process_broadcast_text(message: Message, state: FSMContext, bot: Bot):
         users = result.scalars().all()
         
     if not users:
-        await message.answer("Пользователей в базе данных нет.", reply_markup=get_admin_keyboard())
+        await message.answer("❌ <b>Пользователей в базе данных нет.</b>", reply_markup=get_admin_keyboard(), parse_mode="HTML")
         return
         
     sent_count = 0
     failed_count = 0
     
-    status_msg = await message.answer(f"Начинаю рассылку для {len(users)} пользователей...")
+    status_msg = await message.answer(f"Начинаю рассылку для {len(users)} пользователей...", parse_mode="HTML")
     
     for user_tg_id in users:
         try:
@@ -183,7 +183,7 @@ async def process_gift_tg_id(message: Message, state: FSMContext):
         
     tg_id_str = message.text.strip()
     if not tg_id_str.isdigit():
-        await message.answer("❌ ID должен состоять только из цифр. Попробуйте еще раз:", reply_markup=get_back_keyboard())
+        await message.answer("❌ <b>ID должен состоять только из цифр.</b> Попробуйте еще раз:", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
         
     target_tg_id = int(tg_id_str)
@@ -191,7 +191,7 @@ async def process_gift_tg_id(message: Message, state: FSMContext):
     async with async_session_maker() as session:
         user = await session.scalar(select(User).where(User.tg_id == target_tg_id))
         if not user:
-            await message.answer("❌ Пользователь с таким Telegram ID не найден в базе данных. Попробуйте еще раз:", reply_markup=get_back_keyboard())
+            await message.answer("❌ <b>Пользователь с таким Telegram ID не найден в БД.</b> Попробуйте еще раз:", reply_markup=get_back_keyboard(), parse_mode="HTML")
             return
             
     await state.update_data(gift_tg_id=target_tg_id)
@@ -246,7 +246,7 @@ async def process_gift_days(message: Message, state: FSMContext):
         
     days_str = message.text.strip()
     if not days_str.isdigit():
-        await message.answer("❌ Количество дней должно быть целым числом. Попробуйте еще раз:", reply_markup=get_back_keyboard())
+        await message.answer("❌ <b>Количество дней должно быть целым числом.</b> Попробуйте еще раз:", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
         
     days = int(days_str)
@@ -259,7 +259,7 @@ async def process_gift_days(message: Message, state: FSMContext):
     async with async_session_maker() as session:
         user = await session.scalar(select(User).where(User.tg_id == target_tg_id))
         if not user:
-            await message.answer("❌ Пользователь потерялся. Попробуйте сначала.", reply_markup=get_admin_keyboard())
+            await message.answer("❌ <b>Пользователь не найден. Попробуйте сначала.</b>", reply_markup=get_admin_keyboard(), parse_mode="HTML")
             return
             
         user.plan = selected_plan
@@ -289,7 +289,7 @@ async def process_gift_days(message: Message, state: FSMContext):
 async def admin_stats(message: Message):
     if not is_admin(message.from_user.id):
         return
-    await admin_stats_callback(message) # Поведение аналогичное
+    await admin_stats_callback(message)
 
 @router.message(Command("ban"))
 async def ban_user(message: Message):
@@ -298,14 +298,14 @@ async def ban_user(message: Message):
         
     args = message.text.split(maxsplit=2)
     if len(args) < 3:
-        await message.answer("Использование: /ban <tg_id> <причина>")
+        await message.answer("❌ <b>Использование:</b> <code>/ban &lt;tg_id&gt; &lt;причина&gt;</code>", parse_mode="HTML")
         return
         
     try:
         tg_id = int(args[1])
         reason = args[2]
     except ValueError:
-        await message.answer("Неверный ID.")
+        await message.answer("❌ <b>Неверный ID.</b>", parse_mode="HTML")
         return
         
     async with async_session_maker() as session:
@@ -313,7 +313,7 @@ async def ban_user(message: Message):
         session.add(entry)
         await session.commit()
         
-    await message.answer(f"Пользователь {tg_id} заблокирован в боте.")
+    await message.answer(f"✅ Пользователь <code>{tg_id}</code> заблокирован в боте.", parse_mode="HTML")
 
 @router.message(Command("unban"))
 async def unban_user(message: Message):
@@ -322,13 +322,13 @@ async def unban_user(message: Message):
         
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Использование: /unban <tg_id>")
+        await message.answer("❌ <b>Использование:</b> <code>/unban &lt;tg_id&gt;</code>", parse_mode="HTML")
         return
         
     try:
         tg_id = int(args[1])
     except ValueError:
-        await message.answer("Неверный ID.")
+        await message.answer("❌ <b>Неверный ID.</b>", parse_mode="HTML")
         return
         
     async with async_session_maker() as session:
@@ -336,9 +336,9 @@ async def unban_user(message: Message):
         if entry:
             await session.delete(entry)
             await session.commit()
-            await message.answer(f"Пользователь {tg_id} разблокирован в боте.")
+            await message.answer(f"✅ Пользователь <code>{tg_id}</code> разблокирован в боте.", parse_mode="HTML")
         else:
-            await message.answer("Пользователь не найден в глобальном бане.")
+            await message.answer("❌ <b>Пользователь не найден в глобальном бане.</b>", parse_mode="HTML")
 
 @router.message(Command("give_plan"))
 async def give_plan(message: Message):
@@ -347,7 +347,7 @@ async def give_plan(message: Message):
         
     args = message.text.split(maxsplit=3)
     if len(args) < 4:
-        await message.answer("Использование: /give_plan <tg_id> <plan(lite/pro/corporate)> <days>")
+        await message.answer("❌ <b>Использование:</b> <code>/give_plan &lt;tg_id&gt; &lt;plan(lite/pro/corporate)&gt; &lt;days&gt;</code>", parse_mode="HTML")
         return
         
     try:
@@ -355,20 +355,20 @@ async def give_plan(message: Message):
         plan = PlanEnum(args[2].lower())
         days = int(args[3])
     except ValueError:
-        await message.answer("Неверные параметры.")
+        await message.answer("❌ <b>Неверные параметры.</b>", parse_mode="HTML")
         return
         
     async with async_session_maker() as session:
         user = await session.scalar(select(User).where(User.tg_id == tg_id))
         if not user:
-            await message.answer("Пользователь не найден.")
+            await message.answer("❌ <b>Пользователь не найден.</b>", parse_mode="HTML")
             return
             
         user.plan = plan
         user.subscription_end = datetime.now() + timedelta(days=days)
         await session.commit()
         
-    await message.answer(f"Подписка {plan.value} на {days} дней выдана пользователю {tg_id}.")
+    await message.answer(f"✅ Подписка <b>{plan.value}</b> на <b>{days} дней</b> выдана пользователю <code>{tg_id}</code>.", parse_mode="HTML")
 
 @router.message(Command("broadcast"))
 async def broadcast_cmd(message: Message, bot: Bot):
@@ -377,7 +377,7 @@ async def broadcast_cmd(message: Message, bot: Bot):
         
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Использование: /broadcast <текст рассылки>")
+        await message.answer("❌ <b>Использование:</b> <code>/broadcast &lt;текст рассылки&gt;</code>", parse_mode="HTML")
         return
         
     broadcast_text = args[1]
@@ -388,13 +388,13 @@ async def broadcast_cmd(message: Message, bot: Bot):
         users = result.scalars().all()
         
     if not users:
-        await message.answer("Пользователей в базе данных нет.")
+        await message.answer("❌ <b>Пользователей в базе данных нет.</b>", parse_mode="HTML")
         return
         
     sent_count = 0
     failed_count = 0
     
-    status_msg = await message.answer(f"Начинаю рассылку для {len(users)} пользователей...")
+    status_msg = await message.answer(f"Начинаю рассылку для {len(users)} пользователей...", parse_mode="HTML")
     
     for user_tg_id in users:
         try:

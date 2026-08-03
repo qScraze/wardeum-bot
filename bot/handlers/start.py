@@ -64,7 +64,8 @@ async def send_captcha(message: Message, session):
     
     await message.answer_animation(
         animation=BufferedInputFile(gif_bytes, filename="captcha.gif"),
-        caption="🤖 <b>Проверка на робота</b>\n\nЧтобы начать пользоваться ботом, пожалуйста, введите код с картинки выше:"
+        caption="🤖 <b>Проверка на робота</b>\n\nЧтобы начать пользоваться ботом, пожалуйста, введите код с картинки выше:",
+        parse_mode="HTML"
     )
 
 @router.message(CommandStart())
@@ -155,7 +156,7 @@ async def check_captcha_msg(message: Message, state: FSMContext):
             user.captcha_code = None
             await session.commit()
             
-            await message.answer("✅ <b>Проверка успешно пройдена!</b>")
+            await message.answer("✅ <b>Проверка успешно пройдена!</b>", parse_mode="HTML")
             
             welcome_text = (
                 "🛡 <b>Добро пожаловать в Wardeum!</b>\n\n"
@@ -165,7 +166,7 @@ async def check_captcha_msg(message: Message, state: FSMContext):
             await message.answer(welcome_text, reply_markup=get_start_keyboard(), parse_mode="HTML")
         else:
             # Капча не пройдена, генерируем новую
-            await message.answer("❌ <b>Неверный код!</b> Попробуйте еще раз.")
+            await message.answer("❌ <b>Неверный код!</b> Попробуйте еще раз.", parse_mode="HTML")
             await send_captcha(message, session)
 
 @router.message(Command("help"))
@@ -338,7 +339,7 @@ async def process_redeem_code(message: Message, state: FSMContext):
         user_stmt = select(User).where(User.tg_id == message.from_user.id)
         user = await session.scalar(user_stmt)
         if not user:
-            await message.answer("Ошибка: пользователь не найден.")
+            await message.answer("❌ <b>Ошибка:</b> пользователь не найден в базе данных.", parse_mode="HTML")
             return
 
         # 1. Проверяем активационный ключ
@@ -347,7 +348,7 @@ async def process_redeem_code(message: Message, state: FSMContext):
 
         if act_key:
             if act_key.used_by is not None:
-                await message.answer("❌ Этот активационный ключ уже был использован.", reply_markup=get_start_keyboard())
+                await message.answer("❌ <b>Этот активационный ключ уже был использован.</b>", reply_markup=get_start_keyboard(), parse_mode="HTML")
                 return
             
             # Активируем ключ
@@ -383,11 +384,11 @@ async def process_redeem_code(message: Message, state: FSMContext):
 
         if promo:
             if promo.expires_at and promo.expires_at < now:
-                await message.answer("❌ Срок действия этого промокода истек.", reply_markup=get_start_keyboard())
+                await message.answer("❌ <b>Срок действия этого промокода истек.</b>", reply_markup=get_start_keyboard(), parse_mode="HTML")
                 return
             
             if promo.uses_left == 0:
-                await message.answer("❌ Этот промокод исчерпал лимит использований.", reply_markup=get_start_keyboard())
+                await message.answer("❌ <b>Этот промокод исчерпал лимит использований.</b>", reply_markup=get_start_keyboard(), parse_mode="HTML")
                 return
 
             # Если промокод дает дни подписки
