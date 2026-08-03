@@ -8,8 +8,4 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - wardeum_data:/app/data
-
-volumes:
-  wardeum_data:
-    driver: local
+      - ./data:/app/data
