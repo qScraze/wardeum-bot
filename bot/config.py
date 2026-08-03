@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = 'sqlite+aiosqlite:///./wardeum.db'
     FORCE_SUB_CHANNEL: int | str | None = None
     FORCE_SUB_ENABLED: bool = False
+    CRYPTO_PAY_TOKEN: str = ""
+    CRYPTO_PAY_TESTNET: bool = True
 
     @field_validator("FORCE_SUB_CHANNEL", mode="before")
     @classmethod

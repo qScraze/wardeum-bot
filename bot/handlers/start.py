@@ -1,6 +1,11 @@
+import io
+import math
+import random
+import aiohttp
+import logging
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile, LabeledPrice, PreCheckoutQuery
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, func
@@ -15,6 +20,12 @@ router = Router()
 
 class RedeemCodeState(StatesGroup):
     waiting_for_code = State()
+
+PLANS_INFO = {
+    "lite": {"name": "Lite Plan 💳", "stars": 150, "usd": 3.0, "days": 30, "plan_enum": PlanEnum.LITE},
+    "pro": {"name": "Pro Plan ⭐", "stars": 300, "usd": 6.0, "days": 30, "plan_enum": PlanEnum.PRO},
+    "corporate": {"name": "Corporate Plan 💎", "stars": 600, "usd": 12.0, "days": 30, "plan_enum": PlanEnum.CORPORATE}
+}
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -281,24 +292,245 @@ async def referrals_callback(callback: CallbackQuery, bot: Bot):
         await callback.message.edit_text(text, reply_markup=get_start_keyboard(), parse_mode="HTML")
     await callback.answer()
 
+# --- Логика Подписок и Оплаты ---
+
 @router.callback_query(F.data == "subscription")
 async def subscription_callback(callback: CallbackQuery):
     text = (
         "💳 <b>Тарифные планы Wardeum:</b>\n\n"
         "1️⃣ <b>Lite Plan</b>\n"
         "• Базовый доступ к возможностям бота.\n"
-        "• Стоимость: 290 руб / мес.\n\n"
+        "• Стоимость: 150 ⭐️ Stars или 3 USDT / мес.\n\n"
         "2️⃣ <b>Pro Plan</b>\n"
         "• Полный доступ к расширенным функциям.\n"
-        "• Стоимость: 590 руб / мес.\n\n"
+        "• Стоимость: 300 ⭐️ Stars или 6 USDT / мес.\n\n"
         "3️⃣ <b>Corporate Plan</b>\n"
         "• Максимальные лимиты и приоритетная поддержка.\n"
-        "• Стоимость: 1190 руб / мес.\n\n"
-        "📎 Для активации подписки вы можете использовать <b>активационный ключ</b> или <b>промокод</b> кнопкой ниже."
+        "• Стоимость: 600 ⭐️ Stars или 12 USDT / мес.\n\n"
+        "👇 Выберите тарифный план для покупки подписки:"
     )
     
-    await callback.message.edit_text(text, reply_markup=get_start_keyboard(), parse_mode="HTML")
+    sub_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Lite 💳", callback_data="buy_lite"),
+            InlineKeyboardButton(text="Pro ⭐", callback_data="buy_pro"),
+            InlineKeyboardButton(text="Corporate 💎", callback_data="buy_corporate")
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="cancel_redeem")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=sub_keyboard, parse_mode="HTML")
     await callback.answer()
+
+@router.callback_query(F.data.startswith("buy_"))
+async def choose_payment_method(callback: CallbackQuery):
+    plan_name = callback.data.split("_")[1] # "lite", "pro", "corporate"
+    info = PLANS_INFO.get(plan_name)
+    
+    text = (
+        f"💳 <b>Покупка подписки {info['name']}</b>\n\n"
+        f"⏳ Срок действия: <b>{info['days']} дней</b>\n"
+        f"💵 Стоимость: <b>{info['stars']} ⭐️ Stars</b> или <b>{info['usd']} USDT</b>\n\n"
+        f"Выберите удобный способ оплаты:"
+    )
+    
+    payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⭐️ Telegram Stars", callback_data=f"pay_stars_{plan_name}"),
+            InlineKeyboardButton(text="🪙 Crypto Bot", callback_data=f"pay_crypto_{plan_name}")
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад к тарифам", callback_data="subscription")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=payment_keyboard, parse_mode="HTML")
+    await callback.answer()
+
+# --- 1. Оплата Telegram Stars ---
+
+@router.callback_query(F.data.startswith("pay_stars_"))
+async def pay_stars_callback(callback: CallbackQuery, bot: Bot):
+    plan_name = callback.data.split("_")[2] # "lite", "pro", "corporate"
+    info = PLANS_INFO.get(plan_name)
+    
+    # Отправляем инвойс в Stars (валюта XTR)
+    await bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title=f"Подписка Wardeum - {info['name']}",
+        description=f"Продление подписки {info['name']} на {info['days']} дней",
+        payload=f"stars:{plan_name}:{callback.from_user.id}",
+        provider_token="", # Для Stars токен провайдера пустой
+        currency="XTR",
+        prices=[
+            LabeledPrice(label=f"Тариф {plan_name.capitalize()}", amount=info['stars'])
+        ],
+        start_parameter="buy_subscription"
+    )
+    await callback.answer()
+
+# Хэндлеры для Stars (будут вызываться через aiogram в main.py)
+async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await pre_checkout_query.answer(ok=True)
+
+async def process_successful_payment(message: Message):
+    payload = message.successful_payment.invoice_payload
+    # payload формат: "stars:plan_name:user_tg_id"
+    parts = payload.split(":")
+    if len(parts) < 3 or parts[0] != "stars":
+        await message.answer("❌ <b>Произошла ошибка при обработке платежа.</b>", parse_mode="HTML")
+        return
+        
+    plan_name = parts[1]
+    user_tg_id = int(parts[2])
+    info = PLANS_INFO.get(plan_name)
+    
+    async with async_session_maker() as session:
+        user = await session.scalar(select(User).where(User.tg_id == user_tg_id))
+        if user:
+            user.plan = info['plan_enum']
+            now = datetime.now()
+            current_end = user.subscription_end if user.subscription_end and user.subscription_end > now else now
+            user.subscription_end = current_end + timedelta(days=info['days'])
+            await session.commit()
+            
+            await message.answer(
+                f"✅ <b>Оплата успешно завершена!</b>\n\n"
+                f"Вам начислен тариф: <b>{info['name']}</b>\n"
+                f"Срок действия подписки продлен на <b>{info['days']} дней</b>.",
+                reply_markup=get_start_keyboard(),
+                parse_mode="HTML"
+            )
+        else:
+            await message.answer("❌ <b>Ошибка:</b> Пользователь не найден в базе данных.", parse_mode="HTML")
+
+# --- 2. Оплата Crypto Bot ---
+
+async def make_cryptobot_request(method: str, json_data: dict = None) -> dict | None:
+    if not config.CRYPTO_PAY_TOKEN:
+        return None
+        
+    base_url = "https://testnet-pay.cryptobot.net/api" if config.CRYPTO_PAY_TESTNET else "https://pay.cryptobot.net/api"
+    url = f"{base_url}/{method}"
+    
+    headers = {
+        "Crypto-Pay-API-Token": config.CRYPTO_PAY_TOKEN
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(url, headers=headers, json=json_data) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("ok"):
+                        return data.get("result")
+                logging.error(f"Crypto Bot API error: {resp.status} - {await resp.text()}")
+        except Exception as e:
+            logging.error(f"Crypto Bot request failed: {e}")
+    return None
+
+@router.callback_query(F.data.startswith("pay_crypto_"))
+async def pay_crypto_callback(callback: CallbackQuery):
+    plan_name = callback.data.split("_")[2] # "lite", "pro", "corporate"
+    info = PLANS_INFO.get(plan_name)
+    user_id = callback.from_user.id
+    
+    if not config.CRYPTO_PAY_TOKEN:
+        await callback.message.edit_text(
+            "❌ <b>Оплата через Crypto Bot временно недоступна.</b>\n"
+            "Пожалуйста, свяжитесь с администратором или воспользуйтесь оплатой через Telegram Stars.",
+            reply_markup=get_start_keyboard(),
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+
+    # Создаем инвойс в Crypto Bot
+    invoice_data = {
+        "amount": str(info['usd']),
+        "asset": "USDT",
+        "description": f"Подписка Wardeum - {info['name']}",
+        "payload": f"{user_id}:{plan_name}"
+    }
+    
+    result = await make_cryptobot_request("createInvoice", invoice_data)
+    
+    if not result:
+        await callback.message.edit_text(
+            "❌ <b>Не удалось создать счет оплаты.</b> Попробуйте позже.",
+            reply_markup=get_start_keyboard(),
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+        
+    pay_url = result.get("pay_url")
+    invoice_id = result.get("invoice_id")
+    
+    text = (
+        f"🪙 <b>Счет на оплату через Crypto Bot создан!</b>\n\n"
+        f"Тариф: <b>{info['name']}</b>\n"
+        f"К оплате: <b>{info['usd']} USDT</b>\n\n"
+        f"Для оплаты перейдите по ссылке ниже, оплатите счет и нажмите кнопку «Проверить оплату»:"
+    )
+    
+    crypto_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔗 Оплатить счет", url=pay_url)],
+        [InlineKeyboardButton(text="🔄 Проверить оплату", callback_data=f"check_crypto_{invoice_id}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="subscription")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=crypto_keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("check_crypto_"))
+async def check_crypto_payment(callback: CallbackQuery):
+    invoice_id = int(callback.data.split("_")[2])
+    
+    # Получаем информацию об инвойсе
+    result = await make_cryptobot_request("getInvoices", {"invoice_ids": str(invoice_id)})
+    
+    if not result:
+        await callback.answer("⚠️ Ошибка связи с Crypto Bot API. Попробуйте еще раз.", show_alert=True)
+        return
+        
+    items = result.get("items", [])
+    if not items:
+        await callback.answer("⚠️ Счет не найден.", show_alert=True)
+        return
+        
+    invoice = items[0]
+    status = invoice.get("status")
+    
+    if status == "paid":
+        payload_str = invoice.get("payload")
+        # Формат: "user_id:plan_name"
+        parts = payload_str.split(":")
+        user_id = int(parts[0])
+        plan_name = parts[1]
+        
+        info = PLANS_INFO.get(plan_name)
+        
+        async with async_session_maker() as session:
+            user = await session.scalar(select(User).where(User.tg_id == user_id))
+            if user:
+                user.plan = info['plan_enum']
+                now = datetime.now()
+                current_end = user.subscription_end if user.subscription_end and user.subscription_end > now else now
+                user.subscription_end = current_end + timedelta(days=info['days'])
+                await session.commit()
+                
+                await callback.message.edit_text(
+                    f"✅ <b>Оплата успешно подтверждена!</b>\n\n"
+                    f"Тариф: <b>{info['name']}</b> начислен.\n"
+                    f"Подписка продлена на <b>{info['days']} дней</b>.",
+                    reply_markup=get_start_keyboard(),
+                    parse_mode="HTML"
+                )
+            else:
+                await callback.answer("Ошибка: пользователь не найден.", show_alert=True)
+    else:
+        await callback.answer("⚠️ Счет еще не оплачен. Пожалуйста, совершите платеж в приложении.", show_alert=True)
+
+# --- Активация кодов ---
 
 @router.callback_query(F.data == "activate_code")
 async def activate_code_callback(callback: CallbackQuery, state: FSMContext):

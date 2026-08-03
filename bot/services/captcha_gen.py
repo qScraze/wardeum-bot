@@ -8,12 +8,12 @@ def generate_code(length: int = 6) -> str:
     """Generate a random numeric code."""
     return "".join(random.choices("0123456789", k=length))
 
-def generate_captcha_gif(code: str, width: int = 320, height: int = 120, frames: int = 24, fps: int = 15) -> bytes:
+def generate_captcha_gif(code: str, width: int = 320, height: int = 120, frames: int = 40, fps: int = 10) -> bytes:
     """
     Generate a kinetic optical illusion GIF captcha.
-    Both foreground (text) and background consist of the exact same monochrome noise pattern (2x2 grain size).
-    The background moves in a circular path over time, while the foreground remains stationary.
-    This makes the text completely invisible in a static frame but readable in animation.
+    - Captcha length: 4 seconds (40 frames at 10 FPS).
+    - First 3 seconds (30 frames): Background moves in a random straight direction.
+    - Last 1 second (10 frames): Background stops moving completely (dx=0, dy=0), causing the text to merge with noise.
     """
     # 1. Create a binary text mask (255 for text pixels, 0 for background)
     mask_img = Image.new('L', (width, height), 0)
@@ -41,8 +41,10 @@ def generate_captcha_gif(code: str, width: int = 320, height: int = 120, frames:
     
     # 2. Setup noise parameters
     grain = 2  # Grain size of the static noise (2x2 pixels)
-    max_shift_grains = 5
-    max_shift = max_shift_grains * grain  # Maximum pixel shift (10px)
+    frames_move = 30
+    speed_per_frame = 1.0  # grains per frame
+    max_shift_grains = int(frames_move * speed_per_frame)  # 30 grains max shift
+    max_shift = max_shift_grains * grain  # 60 pixels
     
     big_width = width + 2 * max_shift
     big_height = height + 2 * max_shift
@@ -53,14 +55,22 @@ def generate_captcha_gif(code: str, width: int = 320, height: int = 120, frames:
     # Upscale noise to create blocky grain pattern
     big_noise = np.repeat(np.repeat(small_noise, grain, axis=0), grain, axis=1)
     
+    # Select a random direction (angle) for the background movement
+    angle = random.uniform(0, 2 * math.pi)
+    
     image_frames = []
     for t in range(frames):
-        # Calculate circular offset for the background
-        angle = 2 * math.pi * t / frames
-        dx = int(round(max_shift_grains * math.cos(angle))) * grain
-        dy = int(round(max_shift_grains * math.sin(angle))) * grain
-        
-        # Crop background slice (shifting over time)
+        if t < frames_move:
+            # Linear background movement in the chosen direction
+            current_shift_grains = t * speed_per_frame
+            dx = int(round(current_shift_grains * math.cos(angle))) * grain
+            dy = int(round(current_shift_grains * math.sin(angle))) * grain
+        else:
+            # Stationary phase: background stops and merges with the text
+            dx = 0
+            dy = 0
+            
+        # Crop background slice
         bg_slice = big_noise[max_shift + dy : max_shift + dy + height, max_shift + dx : max_shift + dx + width]
         
         # Crop foreground slice (always stationary at center)
