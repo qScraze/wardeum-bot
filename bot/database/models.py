@@ -36,46 +36,6 @@ class User(Base):
     extra_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
-class Chat(Base):
-    __tablename__ = "chats"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    title: Mapped[str] = mapped_column(String, nullable=False)
-    username: Mapped[str | None] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
-
-class ChatSettings(Base):
-    __tablename__ = "chat_settings"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), unique=True, nullable=False)
-    ai_censor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    captcha_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    antiraid_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    clean_chat_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    link_filter_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    stop_words_filter_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    stop_words: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    antiraid_threshold: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
-    antiraid_window: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
-    captcha_timeout: Mapped[int] = mapped_column(Integer, default=300, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
-
-class CaptchaSession(Base):
-    __tablename__ = "captcha_sessions"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_tg_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    chat_tg_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    code: Mapped[str] = mapped_column(String(6), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 class Blacklist(Base):
     __tablename__ = "blacklists"

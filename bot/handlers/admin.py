@@ -1,8 +1,9 @@
-from aiogram import Router, F
+import asyncio
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy import select, func
-from bot.database.models import User, Chat, Blacklist, PlanEnum
+from bot.database.models import User, Blacklist, PlanEnum
 from bot.database.db import async_session_maker
 from bot.config import config
 from datetime import datetime, timedelta
@@ -19,7 +20,6 @@ async def admin_stats(message: Message):
         
     async with async_session_maker() as session:
         users_count = await session.scalar(select(func.count(User.id)))
-        chats_count = await session.scalar(select(func.count(Chat.id)))
         
         # Subscriptions breakdown
         subs = await session.execute(
@@ -27,14 +27,13 @@ async def admin_stats(message: Message):
             .where(User.plan != PlanEnum.NONE)
             .group_by(User.plan)
         )
-        subs_breakdown = "\n".join([f"{row[0].value}: {row[1]}" for row in subs])
+        subs_breakdown = "\n".join([f"{row[0].value if hasattr(row[0], 'value') else str(row[0])}: {row[1]}" for row in subs])
         
     text = (
-        f"📊 <b>Статистика:</b>\n"
-        f"👥 Всего пользователей: {users_count}\n"
-        f"💬 Всего чатов: {chats_count}\n\n"
+        f"📊 <b>Статистика бота Wardeum:</b>\n\n"
+        f"👥 Всего пользователей в БД: {users_count}\n\n"
         f"💎 <b>Активные подписки:</b>\n"
-        f"{subs_breakdown if subs_breakdown else 'Нет'}"
+        f"{subs_breakdown if subs_breakdown else 'Нет активных подписок'}"
     )
     await message.answer(text, parse_mode="HTML")
 
@@ -60,7 +59,7 @@ async def ban_user(message: Message):
         session.add(entry)
         await session.commit()
         
-    await message.answer(f"Пользователь {tg_id} заблокирован.")
+    await message.answer(f"Пользователь {tg_id} заблокирован в боте.")
 
 @router.message(Command("unban"))
 async def unban_user(message: Message):
@@ -83,7 +82,7 @@ async def unban_user(message: Message):
         if entry:
             await session.delete(entry)
             await session.commit()
-            await message.answer(f"Пользователь {tg_id} разблокирован.")
+            await message.answer(f"Пользователь {tg_id} разблокирован в боте.")
         else:
             await message.answer("Пользователь не найден в глобальном бане.")
 
@@ -116,3 +115,44 @@ async def give_plan(message: Message):
         await session.commit()
         
     await message.answer(f"Подписка {plan.value} на {days} дней выдана пользователю {tg_id}.")
+
+@router.message(Command("broadcast"))
+async def broadcast_cmd(message: Message, bot: Bot):
+    if not is_admin(message.from_user.id):
+        return
+        
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("Использование: /broadcast <текст рассылки>")
+        return
+        
+    broadcast_text = args[1]
+    
+    async with async_session_maker() as session:
+        stmt = select(User.tg_id)
+        result = await session.execute(stmt)
+        users = result.scalars().all()
+        
+    if not users:
+        await message.answer("Пользователей в базе данных нет.")
+        return
+        
+    sent_count = 0
+    failed_count = 0
+    
+    status_msg = await message.answer(f"Начинаю рассылку для {len(users)} пользователей...")
+    
+    for user_tg_id in users:
+        try:
+            await bot.send_message(chat_id=user_tg_id, text=broadcast_text, parse_mode="HTML")
+            sent_count += 1
+            await asyncio.sleep(0.05)  # Telegram limits protection
+        except Exception:
+            failed_count += 1
+            
+    await status_msg.edit_text(
+        f"📊 <b>Рассылка завершена!</b>\n\n"
+        f"✅ Успешно доставлено: {sent_count}\n"
+        f"❌ Ошибок: {failed_count}",
+        parse_mode="HTML"
+    )
